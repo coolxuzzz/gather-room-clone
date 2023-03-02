@@ -4,7 +4,6 @@ import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { AuthService } from '../../services/auth.service';
 import { Application } from '@pixi/app';
 import { Sprite } from 'src/app/classes/sprite';
-import { KeyPressListener } from 'src/app/classes/key-press-listener';
 
 import * as PIXI from 'pixi.js';
 
@@ -26,25 +25,6 @@ export class MapComponent implements OnInit {
     [500, 50],
   ];
 
-  skins = [
-    '../assets/PNGS/davidmartinez.png',
-    '../assets/PNGS/dorio.png',
-    '../assets/PNGS/faraday.png',
-    '../assets/PNGS/johnny.png',
-    '../assets/PNGS/judy.png',
-    '../assets/PNGS/judyscuba.png',
-    '../assets/PNGS/kiwi.png',
-    '../assets/PNGS/lucy.png',
-    '../assets/PNGS/maine.png',
-    '../assets/PNGS/rebecca.png',
-    '../assets/PNGS/river.png',
-    '../assets/PNGS/riverjacket.png',
-    '../assets/PNGS/roguejacket.png',
-    '../assets/PNGS/takemura.png',
-    '../assets/PNGS/takemurajacket.png',
-    '../assets/PNGS/tbug.png',
-  ];
-
   constructor(
     private db: AngularFireDatabase,
     private afAuth: AngularFireAuth,
@@ -62,8 +42,6 @@ export class MapComponent implements OnInit {
         this.playerRef.set({
           id: this.playerId,
           name: 'test',
-          skin: this.skins[Math.floor(Math.random() * 15)],
-          direction: 'down',
           x,
           y,
         });
@@ -84,17 +62,10 @@ export class MapComponent implements OnInit {
 
   initGame() {
     this.app = new Application({
-      width: window.innerWidth,
-      height: window.innerHeight,
-      resolution: window.devicePixelRatio || 1,
-      autoDensity: true,
+      width: 800,
+      height: 600,
     });
-
     this.element.nativeElement.appendChild(this.app.view);
-
-    window.addEventListener('resize', () => {
-      this.app.renderer.resize(window.innerWidth, window.innerHeight);
-    });
     //this.app.ticker.add(this.gameloop);
 
     const allPlayersRef = this.db.database.ref('players');
@@ -102,8 +73,11 @@ export class MapComponent implements OnInit {
     allPlayersRef.on('value', (snapshot: any) => {
       this.allPlayersRef = snapshot.val();
       Object.values(this.allPlayersRef).forEach((player: any) => {
+        console.log(this.allPlayersSprite[player.id]);
         if (this.allPlayersSprite[player.id] === undefined) return;
         this.allPlayersSprite[player.id].updatePosition(player.x, player.y);
+        // this.allPlayersObject[player.id].x = player.x;
+        // this.allPlayersObject[player.id].y = player.y;
       });
     });
 
@@ -112,17 +86,35 @@ export class MapComponent implements OnInit {
       const playerSprite = new Sprite({
         x: newPlayer.x,
         y: newPlayer.y,
-        skin: newPlayer.skin,
-        direction: newPlayer.direction,
         app: this.app,
       });
       this.allPlayersSprite[newPlayer.id] = playerSprite;
+      //this.allPlayersSprit[newPlayer.id] = player.sprite;
+      // PIXI.Assets.load('../../assets/characters/characters.png').then(
+      //   (texture) => {
+      //     this.createSheet(texture);
+      //     const sprite = new PIXI.AnimatedSprite(
+      //       this.allPlayersSheet['stand-down']
+      //     );
+      //     sprite.animationSpeed = 0.1;
+      //     sprite.loop = false;
+      //     sprite.x = newPlayer.x;
+      //     sprite.y = newPlayer.y;
+      //     sprite.scale.set(5);
+      //     texture.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
+      //     this.app.stage.addChild(sprite);
+      //     sprite.play();
+      //     this.allPlayersSprit[newPlayer.id] = sprite;
+      //   }
+      // );
     });
 
     allPlayersRef.on('child_removed', (snapshot: any) => {
       const removedPlayer = snapshot.val();
       this.allPlayersSprite[removedPlayer.id].removeFromStage();
       delete this.allPlayersSprite[removedPlayer.id];
+      // this.app.stage.removeChild(this.allPlayersSprit[removedPlayer.id]);
+      // delete this.allPlayersSprit[removedPlayer.id];
     });
 
     this.keyPressListener();
@@ -133,19 +125,62 @@ export class MapComponent implements OnInit {
     const newY = this.allPlayersRef[this.playerId].y + yChange;
     if (true) {
       //move to the next space
-      this.allPlayersSprite[this.playerId].updatePosition(newX, newY);
+      // const playerSprite = this.allPlayersSprit[this.playerId];
+      // playerSprite.textures = this.allPlayersSheet['walk-down'];
+      // playerSprite.play();
+      console.log(this.allPlayersSprite[this.playerId]);
+      this.allPlayersSprite[this.playerId].setAnimation('walk-down');
       this.allPlayersRef[this.playerId].x = newX;
       this.allPlayersRef[this.playerId].y = newY;
-      this.allPlayersRef[this.playerId].direction =
-        this.allPlayersSprite[this.playerId].direction;
+      // if (xChange === 1) {
+      //   players[playerId].direction = 'right';
+      // }
+      // if (xChange === -1) {
+      //   players[playerId].direction = 'left';
+      // }
       this.playerRef.set(this.allPlayersRef[this.playerId]);
     }
   }
 
   keyPressListener() {
-    new KeyPressListener('KeyW', () => this.handleArrowPress(0, -4));
-    new KeyPressListener('KeyS', () => this.handleArrowPress(0, 4));
-    new KeyPressListener('KeyA', () => this.handleArrowPress(-4, 0));
-    new KeyPressListener('KeyD', () => this.handleArrowPress(4, 0));
+    window.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'w':
+          this.handleArrowPress(0, -32);
+          break;
+        case 'a':
+          this.handleArrowPress(-32, 0);
+          break;
+        case 's':
+          this.handleArrowPress(0, 32);
+          break;
+        case 'd':
+          this.handleArrowPress(32, 0);
+          break;
+      }
+    });
+  }
+
+  // createSheet(sheet: any) {
+  //   this.allPlayersSheet = {
+  //     'stand-down': [
+  //       new PIXI.Texture(sheet, new PIXI.Rectangle(4 * 16, 6 * 22, 16, 22)),
+  //     ],
+  //     'walk-down': [
+  //       new PIXI.Texture(sheet, new PIXI.Rectangle(4 * 16, 6 * 22, 16, 22)),
+  //       new PIXI.Texture(sheet, new PIXI.Rectangle(4 * 16, 5 * 22, 16, 22)),
+  //       new PIXI.Texture(sheet, new PIXI.Rectangle(4 * 16, 6 * 22, 16, 22)),
+  //       new PIXI.Texture(sheet, new PIXI.Rectangle(4 * 16, 7 * 22, 16, 22)),
+  //       new PIXI.Texture(sheet, new PIXI.Rectangle(4 * 16, 6 * 22, 16, 22)),
+  //     ],
+  //   };
+  // }
+
+  gridx(x: number) {
+    return x * 16;
+  }
+
+  gridy(y: number) {
+    return y * 22;
   }
 }

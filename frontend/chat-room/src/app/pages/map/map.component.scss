@@ -1,0 +1,11 @@
+#game-container {
+  position: relative;
+  margin: 0 auto;
+  width: 352px;
+  height: 198px;
+  transform: scale(3);
+}
+
+#game-container canvas {
+  image-rendering: pixelated;
+}
