@@ -6,6 +6,7 @@ export class Player {
   y: number;
   direction: string = 'down';
   sprite: Sprite;
+  isSpriteLoaded: boolean = false;
   moveUpdate: { [key: string]: [number, number] } = {
     up: [0, -16],
     down: [0, 16],

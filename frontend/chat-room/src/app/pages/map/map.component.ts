@@ -95,9 +95,16 @@ export class MapComponent implements OnInit {
       height: 480,
     });
 
+    const mapContainer = new PIXI.Container();
+    const otherPlayersContainer = new PIXI.Container();
+    const mePlayerContainer = new PIXI.Container();
+    this.app.stage.addChild(mapContainer);
+    this.app.stage.addChild(otherPlayersContainer);
+    this.app.stage.addChild(mePlayerContainer);
+
     // init background map
     this.map = PIXI.Sprite.from('../../assets/map2.png');
-    this.app.stage.addChild(this.map);
+    mapContainer.addChild(this.map);
 
     // real time player updates
     const allPlayersRef = this.db.database.ref('players');
@@ -125,6 +132,16 @@ export class MapComponent implements OnInit {
         app: this.app,
       });
       this.allPlayers[playerSnapshot.id] = newPlayer;
+      // window.setTimeout(() => {
+      //   return newPlayer.isSpriteLoaded === true;
+      // }, 100);
+      // if (playerSnapshot.id === this.playerId) {
+      //   mePlayerContainer.addChild(newPlayer.playerSprite);
+      // } else {
+      //   otherPlayersContainer.addChild(newPlayer.playerSprite);
+      // }
+      //this.app.stage.addChild(newPlayer.playerSprite);
+      // newPlayer.playerSprite.play();
     });
 
     allPlayersRef.on('child_removed', (snapshot: any) => {
