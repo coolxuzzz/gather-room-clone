@@ -5,6 +5,7 @@ import { AuthService } from '../../services/auth.service';
 import { Application } from '@pixi/app';
 import { Sprite } from 'src/app/classes/sprite';
 import { KeyPressListener } from 'src/app/classes/key-press-listener';
+import { Player } from 'src/app/classes/player';
 
 import * as PIXI from 'pixi.js';
 
@@ -18,7 +19,8 @@ export class MapComponent implements OnInit {
   playerId!: string;
   playerRef!: any;
   allPlayersRef: any = {};
-  allPlayersSprite: { [key: string]: Sprite } = {};
+  allPlayers: { [key: string]: Player } = {};
+  map!: PIXI.Sprite;
 
   position = [
     [303, 30],
@@ -80,64 +82,74 @@ export class MapComponent implements OnInit {
     this.authService.login();
   }
 
-  gameloop() {}
+  gameloop = () => {
+    requestAnimationFrame(this.gameloop);
+    this.app.renderer.render(this.app.stage);
+  };
 
   initGame() {
+    // initialize the game canvas
     this.app = new Application({
-      width: window.innerWidth,
-      height: window.innerHeight,
-      resolution: window.devicePixelRatio || 1,
-      autoDensity: true,
+      view: document.getElementById('game-canvas') as HTMLCanvasElement,
+      width: 800,
+      height: 480,
     });
 
-    this.element.nativeElement.appendChild(this.app.view);
+    // init background map
+    this.map = PIXI.Sprite.from('../../assets/map2.png');
+    this.app.stage.addChild(this.map);
 
-    window.addEventListener('resize', () => {
-      this.app.renderer.resize(window.innerWidth, window.innerHeight);
-    });
-    //this.app.ticker.add(this.gameloop);
-
+    // real time player updates
     const allPlayersRef = this.db.database.ref('players');
 
     allPlayersRef.on('value', (snapshot: any) => {
       this.allPlayersRef = snapshot.val();
       Object.values(this.allPlayersRef).forEach((player: any) => {
-        if (this.allPlayersSprite[player.id] === undefined) return;
-        this.allPlayersSprite[player.id].updatePosition(player.x, player.y);
+        if (this.allPlayers[player.id].playerSprite === undefined) return;
+        this.allPlayers[player.id].updatePosition(
+          player.x,
+          player.y,
+          this.allPlayersRef[this.playerId]
+        );
       });
     });
 
     allPlayersRef.on('child_added', (snapshot: any) => {
-      const newPlayer = snapshot.val();
-      const playerSprite = new Sprite({
-        x: newPlayer.x,
-        y: newPlayer.y,
-        skin: newPlayer.skin,
-        direction: newPlayer.direction,
+      const playerSnapshot = snapshot.val();
+      const newPlayer = new Player({
+        id: playerSnapshot.id,
+        x: playerSnapshot.x,
+        y: playerSnapshot.y,
+        skin: playerSnapshot.skin,
+        direction: playerSnapshot.direction,
         app: this.app,
       });
-      this.allPlayersSprite[newPlayer.id] = playerSprite;
+      this.allPlayers[playerSnapshot.id] = newPlayer;
     });
 
     allPlayersRef.on('child_removed', (snapshot: any) => {
       const removedPlayer = snapshot.val();
-      this.allPlayersSprite[removedPlayer.id].removeFromStage();
-      delete this.allPlayersSprite[removedPlayer.id];
+      this.allPlayers[removedPlayer.id].remove();
+      delete this.allPlayers[removedPlayer.id];
     });
 
     this.keyPressListener();
   }
 
   handleArrowPress(xChange = 0, yChange = 0) {
-    const newX = this.allPlayersRef[this.playerId].x + xChange;
-    const newY = this.allPlayersRef[this.playerId].y + yChange;
+    const cameraPerson = this.allPlayersRef[this.playerId];
+    const newX = cameraPerson.x + xChange;
+    const newY = cameraPerson.y + yChange;
+
+    // update map
+    this.map.position.set(384 - cameraPerson.x, 240 - cameraPerson.y);
     if (true) {
       //move to the next space
-      this.allPlayersSprite[this.playerId].updatePosition(newX, newY);
+      this.allPlayers[this.playerId].updatePosition(newX, newY, cameraPerson);
       this.allPlayersRef[this.playerId].x = newX;
       this.allPlayersRef[this.playerId].y = newY;
       this.allPlayersRef[this.playerId].direction =
-        this.allPlayersSprite[this.playerId].direction;
+        this.allPlayers[this.playerId].direction;
       this.playerRef.set(this.allPlayersRef[this.playerId]);
     }
   }

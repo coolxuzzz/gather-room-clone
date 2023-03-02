@@ -1,19 +1,22 @@
 import * as PIXI from 'pixi.js';
+import { Player } from './player';
 
 export class Sprite {
   texture: any;
   isLoaded = false;
   animations: any;
-  direction!: string;
   skin: string;
   playerSprite!: PIXI.AnimatedSprite;
   animateSpriteSheet: any;
   app: PIXI.Application;
-  isMoving: boolean = false;
+  playerObject: Player;
 
   constructor(config: any) {
     this.app = config.app;
     this.skin = config.skin;
+    this.playerObject = config.playerObject;
+
+    // load the texture we need
     PIXI.Assets.load(this.skin).then((texture) => {
       this.createSpriteSheet(texture);
       this.createPlayerSprite(texture, config);
@@ -69,11 +72,11 @@ export class Sprite {
     this.playerSprite = new PIXI.AnimatedSprite(
       this.animateSpriteSheet['stand-' + config.direction]
     );
-    this.playerSprite.animationSpeed = 0.2;
+    this.playerSprite.animationSpeed = 0.1;
     this.playerSprite.loop = false;
     this.playerSprite.x = config.x;
     this.playerSprite.y = config.y;
-    this.playerSprite.scale.set(2);
+    this.playerSprite.scale.set(1.2);
     texture.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
     this.app.stage.addChild(this.playerSprite);
     this.playerSprite.play();
@@ -87,7 +90,7 @@ export class Sprite {
     if (!this.playerSprite.playing) {
       this.playerSprite.textures = this.animateSpriteSheet['walk-' + direction];
       this.playerSprite.play();
-      this.direction = direction;
+      this.playerObject.direction = direction;
       this.playerSprite.onComplete = () => {
         this.playerSprite.textures =
           this.animateSpriteSheet['stand-' + direction];
@@ -95,9 +98,9 @@ export class Sprite {
     }
   }
 
-  updatePosition(x: number, y: number) {
-    const xChange = x - this.playerSprite.x;
-    const yChange = y - this.playerSprite.y;
+  updatePosition(x: number, y: number, xSprite: number, ySprite: number) {
+    const xChange = x - this.playerObject.x;
+    const yChange = y - this.playerObject.y;
     if (xChange > 0) {
       this.setAnimation('right');
     } else if (xChange < 0) {
@@ -107,7 +110,8 @@ export class Sprite {
     } else if (yChange < 0) {
       this.setAnimation('up');
     }
-    this.playerSprite.x = x;
-    this.playerSprite.y = y;
+    this.playerObject.x = x;
+    this.playerObject.y = y;
+    this.playerSprite.position.set(xSprite, ySprite);
   }
 }
