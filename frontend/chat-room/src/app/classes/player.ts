@@ -11,10 +11,10 @@ export class Player {
 
   private sprite: Sprite;
   private moveUpdate: { [key: string]: [number, number] } = {
-    up: [0, -4],
-    down: [0, 4],
-    left: [-4, 0],
-    right: [4, 0],
+    up: [0, -8],
+    down: [0, 8],
+    left: [-8, 0],
+    right: [8, 0],
   };
 
   private Utils: UtilsService = new UtilsService();
