@@ -1,18 +1,23 @@
 import { Sprite } from './sprite';
+import { UtilsService } from 'src/app/services/utils.service';
 
 export class Player {
   id: string;
   x: number;
   y: number;
   direction: string = 'down';
-  sprite: Sprite;
   isSpriteLoaded: boolean = false;
-  moveUpdate: { [key: string]: [number, number] } = {
-    up: [0, -16],
-    down: [0, 16],
-    left: [-16, 0],
-    right: [16, 0],
+  isPlayerMoving: boolean = false;
+
+  private sprite: Sprite;
+  private moveUpdate: { [key: string]: [number, number] } = {
+    up: [0, -4],
+    down: [0, 4],
+    left: [-4, 0],
+    right: [4, 0],
   };
+
+  private Utils: UtilsService = new UtilsService();
 
   constructor(config: any) {
     this.id = config.id;
@@ -21,7 +26,7 @@ export class Player {
     this.sprite = new Sprite({
       skin: config.skin,
       playerObject: this,
-      app: config.app,
+      container: config.container,
       direction: config.direction || 'down',
     });
   }
@@ -30,13 +35,43 @@ export class Player {
     return this.sprite.playerSprite;
   }
 
-  remove() {
-    this.sprite.removeFromStage();
+  update(state: any) {
+    this.refineState(state);
+    this.updatePosition(state);
+    this.updateSprite(state);
   }
 
-  updatePosition(x: number, y: number, cameraPerson: any) {
-    const xSprite = x + 384 - cameraPerson.x;
-    const ySprite = y + 246 - cameraPerson.y;
-    this.sprite.updatePosition(x, y, xSprite, ySprite);
+  private updatePosition(state: any) {
+    if (this.isPlayerMoving && state.direction !== this.direction) return;
+    this.x = state.x;
+    this.y = state.y;
+  }
+
+  private updateSprite(state: any) {
+    this.sprite.update(state);
+  }
+
+  refineState(state: any) {
+    if (state.direction === undefined) {
+      const xChange = state.x - this.x;
+      const yChange = state.y - this.y;
+      if (xChange > 0) {
+        state.direction = 'right';
+      } else if (xChange < 0) {
+        state.direction = 'left';
+      } else if (yChange > 0) {
+        state.direction = 'down';
+      } else if (yChange < 0) {
+        state.direction = 'up';
+      }
+    } else {
+      const [x, y] = this.moveUpdate[state.direction];
+      state.x = this.x + x;
+      state.y = this.y + y;
+    }
+  }
+
+  remove() {
+    this.sprite.removeFromStage();
   }
 }

@@ -3,7 +3,7 @@ import { AngularFireDatabase } from '@angular/fire/compat/database';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { AuthService } from '../../services/auth.service';
 import { Application } from '@pixi/app';
-import { Sprite } from 'src/app/classes/sprite';
+import { UtilsService } from 'src/app/services/utils.service';
 import { KeyPressListener } from 'src/app/classes/key-press-listener';
 import { Player } from 'src/app/classes/player';
 
@@ -15,18 +15,21 @@ import * as PIXI from 'pixi.js';
   styleUrls: ['./map.component.scss'],
 })
 export class MapComponent implements OnInit {
+  // map states
+  WIDTH = 960;
+  HEIGHT = 720;
+  BG_COLOR = 0xd9f4ff;
+  speed = 4;
+
   app!: Application;
   playerId!: string;
   playerRef!: any;
   allPlayersRef: any = {};
   allPlayers: { [key: string]: Player } = {};
-  map!: PIXI.Sprite;
-
-  position = [
-    [303, 30],
-    [100, 10],
-    [500, 50],
-  ];
+  mapLowerContainer!: PIXI.Container;
+  mapUpperContainer!: PIXI.Container;
+  otherPlayersContainer!: PIXI.Container;
+  mePlayerContainer!: PIXI.Container;
 
   skins = [
     '../assets/PNGS/davidmartinez.png',
@@ -51,14 +54,13 @@ export class MapComponent implements OnInit {
     private db: AngularFireDatabase,
     private afAuth: AngularFireAuth,
     private authService: AuthService,
-    private element: ElementRef
+    private Utils: UtilsService
   ) {}
 
   ngOnInit(): void {
     this.afAuth.onAuthStateChanged((user) => {
       if (user) {
         // you're' logged in
-        const [x, y] = this.position[Math.floor(Math.random() * 3)];
         this.playerId = user.uid;
         this.playerRef = this.db.database.ref(`players/${this.playerId}`);
         this.playerRef.set({
@@ -66,8 +68,8 @@ export class MapComponent implements OnInit {
           name: 'test',
           skin: this.skins[Math.floor(Math.random() * 15)],
           direction: 'down',
-          x,
-          y,
+          x: this.Utils.withGrid(38),
+          y: this.Utils.withGrid(14),
         });
 
         this.playerRef.onDisconnect().remove();
@@ -82,66 +84,47 @@ export class MapComponent implements OnInit {
     this.authService.login();
   }
 
-  gameloop = () => {
-    requestAnimationFrame(this.gameloop);
-    this.app.renderer.render(this.app.stage);
-  };
-
   initGame() {
     // initialize the game canvas
     this.app = new Application({
       view: document.getElementById('game-canvas') as HTMLCanvasElement,
-      width: 800,
-      height: 480,
+      width: this.WIDTH,
+      height: this.HEIGHT,
+      backgroundColor: this.BG_COLOR,
     });
 
-    const mapContainer = new PIXI.Container();
-    const otherPlayersContainer = new PIXI.Container();
-    const mePlayerContainer = new PIXI.Container();
-    this.app.stage.addChild(mapContainer);
-    this.app.stage.addChild(otherPlayersContainer);
-    this.app.stage.addChild(mePlayerContainer);
+    // initialize the map
+    this.initMap();
 
-    // init background map
-    this.map = PIXI.Sprite.from('../../assets/map2.png');
-    mapContainer.addChild(this.map);
-
-    // real time player updates
+    // real time player activities updates
     const allPlayersRef = this.db.database.ref('players');
 
     allPlayersRef.on('value', (snapshot: any) => {
       this.allPlayersRef = snapshot.val();
       Object.values(this.allPlayersRef).forEach((player: any) => {
-        if (this.allPlayers[player.id].playerSprite === undefined) return;
-        this.allPlayers[player.id].updatePosition(
-          player.x,
-          player.y,
-          this.allPlayersRef[this.playerId]
-        );
+        this.loadOtherPlayers(player);
       });
     });
 
     allPlayersRef.on('child_added', (snapshot: any) => {
       const playerSnapshot = snapshot.val();
+
+      // add player to the game
+      let container =
+        playerSnapshot.id === this.playerId
+          ? this.mePlayerContainer
+          : this.otherPlayersContainer;
+
       const newPlayer = new Player({
         id: playerSnapshot.id,
         x: playerSnapshot.x,
         y: playerSnapshot.y,
         skin: playerSnapshot.skin,
         direction: playerSnapshot.direction,
-        app: this.app,
+        container: container,
       });
+
       this.allPlayers[playerSnapshot.id] = newPlayer;
-      // window.setTimeout(() => {
-      //   return newPlayer.isSpriteLoaded === true;
-      // }, 100);
-      // if (playerSnapshot.id === this.playerId) {
-      //   mePlayerContainer.addChild(newPlayer.playerSprite);
-      // } else {
-      //   otherPlayersContainer.addChild(newPlayer.playerSprite);
-      // }
-      //this.app.stage.addChild(newPlayer.playerSprite);
-      // newPlayer.playerSprite.play();
     });
 
     allPlayersRef.on('child_removed', (snapshot: any) => {
@@ -153,28 +136,76 @@ export class MapComponent implements OnInit {
     this.keyPressListener();
   }
 
-  handleArrowPress(xChange = 0, yChange = 0) {
-    const cameraPerson = this.allPlayersRef[this.playerId];
-    const newX = cameraPerson.x + xChange;
-    const newY = cameraPerson.y + yChange;
+  initMap() {
+    // initialize different layers of the game
+    this.mapLowerContainer = new PIXI.Container();
+    this.mapUpperContainer = new PIXI.Container();
+    this.otherPlayersContainer = new PIXI.Container();
+    this.mePlayerContainer = new PIXI.Container();
 
-    // update map
-    this.map.position.set(384 - cameraPerson.x, 240 - cameraPerson.y);
+    this.app.stage.addChild(this.mapLowerContainer);
+    this.app.stage.addChild(this.otherPlayersContainer);
+    this.app.stage.addChild(this.mePlayerContainer);
+    this.app.stage.addChild(this.mapUpperContainer);
+
+    // initialize the game map
+    const mapLower = PIXI.Sprite.from('../../assets/map-lower.png');
+    const mapUpper = PIXI.Sprite.from('../../assets/map-upper.png');
+    console.log(this.Utils.xOffSet() - this.playerRef.x);
+    this.mapLowerContainer.position.set(
+      this.Utils.xOffSet() - this.Utils.withGrid(38),
+      this.Utils.yOffSet() - this.Utils.withGrid(14)
+    );
+    this.mapUpperContainer.position.set(
+      this.Utils.xOffSet() - this.Utils.withGrid(38),
+      this.Utils.yOffSet() - this.Utils.withGrid(14)
+    );
+    this.mapLowerContainer.addChild(mapLower);
+    this.mapUpperContainer.addChild(mapUpper);
+  }
+
+  handleArrowPress(direction: string) {
+    const cameraPerson = this.allPlayersRef[this.playerId];
+
     if (true) {
       //move to the next space
-      this.allPlayers[this.playerId].updatePosition(newX, newY, cameraPerson);
-      this.allPlayersRef[this.playerId].x = newX;
-      this.allPlayersRef[this.playerId].y = newY;
-      this.allPlayersRef[this.playerId].direction =
-        this.allPlayers[this.playerId].direction;
+      const mePlayer = this.allPlayers[this.playerId];
+      mePlayer.update({ direction: direction, cameraPerson: mePlayer });
+      this.allPlayersRef[this.playerId].x = mePlayer.x;
+      this.allPlayersRef[this.playerId].y = mePlayer.y;
+      this.allPlayersRef[this.playerId].direction = mePlayer.direction;
       this.playerRef.set(this.allPlayersRef[this.playerId]);
+    }
+
+    // update map position
+    this.mapLowerContainer.position.set(
+      this.Utils.xOffSet() - cameraPerson.x,
+      this.Utils.yOffSet() - cameraPerson.y
+    );
+    this.mapUpperContainer.position.set(
+      this.Utils.xOffSet() - cameraPerson.x,
+      this.Utils.yOffSet() - cameraPerson.y
+    );
+  }
+
+  loadOtherPlayers(player: any) {
+    if (this.allPlayers[player.id].isSpriteLoaded === false) {
+      setTimeout(() => {
+        this.loadOtherPlayers(player);
+      }, 100);
+    } else {
+      this.allPlayers[player.id].update({
+        x: player.x,
+        y: player.y,
+        cameraPerson: this.allPlayersRef[this.playerId],
+      });
     }
   }
 
   keyPressListener() {
-    new KeyPressListener('KeyW', () => this.handleArrowPress(0, -4));
-    new KeyPressListener('KeyS', () => this.handleArrowPress(0, 4));
-    new KeyPressListener('KeyA', () => this.handleArrowPress(-4, 0));
-    new KeyPressListener('KeyD', () => this.handleArrowPress(4, 0));
+    new KeyPressListener('KeyW', () => this.handleArrowPress('up'));
+    new KeyPressListener('KeyS', () => this.handleArrowPress('down'));
+    new KeyPressListener('KeyA', () => this.handleArrowPress('left'));
+    new KeyPressListener('KeyD', () => this.handleArrowPress('right'));
   }
 }

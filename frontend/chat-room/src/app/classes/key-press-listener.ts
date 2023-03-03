@@ -1,9 +1,10 @@
 export class KeyPressListener {
   keyCode: string;
-  callback: any;
+  lastKey: string = '';
+  callback: () => void;
   keySafe: boolean;
 
-  constructor(keyCode: any, callback: any) {
+  constructor(keyCode: string, callback: () => void) {
     this.keyCode = keyCode;
     this.callback = callback;
     this.keySafe = true;
@@ -13,10 +14,10 @@ export class KeyPressListener {
 
   keydownFunction = (event: KeyboardEvent) => {
     if (event.code === this.keyCode) {
-      //if (this.keySafe) {
-      this.keySafe = false;
-      this.callback();
-      //}
+      if (this.keySafe) {
+        //this.keySafe = false;
+        this.callback();
+      }
     }
   };
 

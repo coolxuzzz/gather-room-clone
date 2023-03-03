@@ -1,18 +1,17 @@
 import * as PIXI from 'pixi.js';
 import { Player } from './player';
+import { UtilsService } from 'src/app/services/utils.service';
 
 export class Sprite {
-  texture: any;
-  isLoaded = false;
-  animations: any;
-  skin: string;
+  private skin: string;
   playerSprite!: PIXI.AnimatedSprite;
-  animateSpriteSheet: any;
-  app: PIXI.Application;
-  playerObject: Player;
+  private animateSpriteSheet: any;
+  private container: PIXI.Container;
+  private playerObject: Player;
+  private Utils: UtilsService = new UtilsService();
 
   constructor(config: any) {
-    this.app = config.app;
+    this.container = config.container;
     this.skin = config.skin;
     this.playerObject = config.playerObject;
 
@@ -23,7 +22,7 @@ export class Sprite {
     });
   }
 
-  createSpriteSheet(sheet: any) {
+  private createSpriteSheet(sheet: any) {
     this.animateSpriteSheet = {
       'stand-down': [
         new PIXI.Texture(sheet, new PIXI.Rectangle(0 * 32, 0 * 32, 32, 32)),
@@ -42,78 +41,69 @@ export class Sprite {
         new PIXI.Texture(sheet, new PIXI.Rectangle(1 * 32, 0 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(2 * 32, 0 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(3 * 32, 0 * 32, 32, 32)),
-        //new PIXI.Texture(sheet, new PIXI.Rectangle(0 * 32, 0 * 32, 32, 32)),
       ],
       'walk-up': [
         new PIXI.Texture(sheet, new PIXI.Rectangle(0 * 32, 3 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(1 * 32, 3 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(2 * 32, 3 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(3 * 32, 3 * 32, 32, 32)),
-        //new PIXI.Texture(sheet, new PIXI.Rectangle(0 * 32, 3 * 32, 32, 32)),
       ],
       'walk-left': [
         new PIXI.Texture(sheet, new PIXI.Rectangle(0 * 32, 2 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(1 * 32, 2 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(2 * 32, 2 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(3 * 32, 2 * 32, 32, 32)),
-        //new PIXI.Texture(sheet, new PIXI.Rectangle(0 * 32, 2 * 32, 32, 32)),
       ],
       'walk-right': [
         new PIXI.Texture(sheet, new PIXI.Rectangle(0 * 32, 1 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(1 * 32, 1 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(2 * 32, 1 * 32, 32, 32)),
         new PIXI.Texture(sheet, new PIXI.Rectangle(3 * 32, 1 * 32, 32, 32)),
-        //new PIXI.Texture(sheet, new PIXI.Rectangle(0 * 32, 1 * 32, 32, 32)),
       ],
     };
   }
 
-  createPlayerSprite(texture: any, config: any) {
+  private createPlayerSprite(texture: any, config: any) {
     this.playerSprite = new PIXI.AnimatedSprite(
       this.animateSpriteSheet['stand-' + config.direction]
     );
-    this.playerSprite.animationSpeed = 0.1;
+    this.playerSprite.animationSpeed = 0.15;
     this.playerSprite.loop = false;
     this.playerSprite.x = config.x;
     this.playerSprite.y = config.y;
-    this.playerSprite.scale.set(1.2);
+    this.playerSprite.scale.set(2);
     texture.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
     this.playerObject.isSpriteLoaded = true;
-
-    this.app.stage.addChild(this.playerSprite);
+    this.container.addChild(this.playerSprite);
     this.playerSprite.play();
   }
 
   removeFromStage() {
-    this.app.stage.removeChild(this.playerSprite);
+    this.container.removeChild(this.playerSprite);
   }
 
-  setAnimation(direction: string) {
+  private playAnimation(direction: string) {
     if (!this.playerSprite.playing) {
+      this.playerObject.isPlayerMoving = true;
+      this.playerObject.direction = direction;
       this.playerSprite.textures = this.animateSpriteSheet['walk-' + direction];
       this.playerSprite.play();
-      this.playerObject.direction = direction;
       this.playerSprite.onComplete = () => {
         this.playerSprite.textures =
           this.animateSpriteSheet['stand-' + direction];
+        this.playerObject.isPlayerMoving = false;
       };
     }
   }
 
-  updatePosition(x: number, y: number, xSprite: number, ySprite: number) {
-    const xChange = x - this.playerObject.x;
-    const yChange = y - this.playerObject.y;
-    if (xChange > 0) {
-      this.setAnimation('right');
-    } else if (xChange < 0) {
-      this.setAnimation('left');
-    } else if (yChange > 0) {
-      this.setAnimation('down');
-    } else if (yChange < 0) {
-      this.setAnimation('up');
+  update(state: any) {
+    const x = this.playerObject.x + this.Utils.xOffSet() - state.cameraPerson.x;
+    const y = this.playerObject.y + this.Utils.yOffSet() - state.cameraPerson.y;
+
+    if (state.direction !== undefined) {
+      this.playAnimation(state.direction);
     }
-    this.playerObject.x = x;
-    this.playerObject.y = y;
-    this.playerSprite.position.set(xSprite, ySprite);
+
+    this.playerSprite.position.set(x, y);
   }
 }
